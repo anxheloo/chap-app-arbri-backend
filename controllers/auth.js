@@ -6,6 +6,7 @@ const filterObject = require("../utils/filterObject");
 const { promisify } = require("util");
 const mailService = require("../services/mailer");
 const otp = require("../templates/otp");
+const resetPassword = require("../templates/resetPassword");
 
 const signToken = (userId) => {
   return jwt.sign({ userId }, process.env.SECRET);
@@ -26,7 +27,7 @@ exports.register = async (req, res, next) => {
   const existingUser = await User.findOne({ email: email });
 
   if (existingUser && existingUser.verified) {
-    res.status(400).json({
+    return res.status(400).json({
       status: "error",
       message: "User already exist, please log in!",
     });
@@ -58,9 +59,6 @@ exports.sendOTP = async (req, res, next) => {
     lowerCaseAlphabets: false,
   });
   const otp_expiry_time = Date.now() + 10 * 60 * 1000; // 10 Mins after otp is sent
-  // const user = await User.findByIdaAndUpdate(userId, {
-  //   otp_expiry_time: otp_expiry_time,
-  // });
   const user = await User.findById(userId);
   user.otp_expiry_time = otp_expiry_time;
   user.otp = new_otp.toString();
@@ -104,12 +102,10 @@ exports.verifyOTP = async (req, res, next) => {
   }
 
   if (!(await user.correctOTP(otp, user.otp))) {
-    res.status(400).json({
+    return res.status(400).json({
       status: "error",
       message: "OTP is incorrect",
     });
-
-    return;
   }
 
   // OTP is correct
@@ -205,7 +201,7 @@ exports.protect = async (req, res, next) => {
   next();
 };
 
-// forgot password
+// Forgot password
 exports.forgotPassword = async (req, res, next) => {
   // 1.get user email
   const user = await User.findOne({ email: req.body.email });
@@ -221,14 +217,25 @@ exports.forgotPassword = async (req, res, next) => {
   const resetToken = user.createPasswordResetToken();
   await user.save({ validateBeforeSave: false });
 
-  // const resetURL = `https://arbri.com/auth/reset-password/?code=${resetToken}`;
-
+  // 3) Send email to user with reset url
   try {
-    // send email to user with reset url
-
     console.log("this is reset token: ", resetToken);
+    const resetURL = `http://localhost:3000/auth/new-password?token=${resetToken}`;
 
-    res.status(200).json({
+    const msg = {
+      from: "anxhelocenollari@gmail.com",
+      to: user.email,
+      subject: "Password reset link",
+      html: resetPassword(user.firstName, resetURL),
+      // html:"this is a simple email",
+      attachments: [],
+      //  text: "cabonemir",
+    };
+
+    // if (process.env.ENABLE_EMAIL_SENDING === "true") {
+    await mailService.sendSGMail(msg);
+
+    return res.status(200).json({
       status: "success",
       message: "Reset password link sent to email!",
     });
@@ -240,20 +247,17 @@ exports.forgotPassword = async (req, res, next) => {
 
     res.status(500).json({
       status: "error",
-      message: "There was an error sending email, please try again later",
+      message: "Error occurred, try again!",
     });
   }
 };
 
 // reset password
 exports.resetPassword = async (req, res, next) => {
-  const { newPassword, confirmPassword } = req.body;
+  const { newPassword, confirmPassword, token } = req.body;
 
   // 1) Get user based on the token
-  const hashedToken = crypto
-    .createHash("sha256")
-    .update(req.body.token)
-    .digest("hex");
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
   const user = await User.findOne({
     passwordResetToken: hashedToken,
@@ -277,11 +281,11 @@ exports.resetPassword = async (req, res, next) => {
 
   // 3) Update changedPasswordAt property for the user
   // 4) Log the user in, send JWT
-  const token = signToken(user._id);
+  const newToken = signToken(user._id);
 
   res.status(200).json({
     status: "success",
-    message: "Password Reseted Successfully",
-    token,
+    message: "Password Reset Successfully",
+    token: newToken,
   });
 };
