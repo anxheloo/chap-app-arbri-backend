@@ -31,7 +31,8 @@ app.use(mongoSanitize());
 
 app.use(
   cors({
-    origin: "*",
+    // origin: "*",
+    origin: "http://localhost:3000",
     methods: ["GET", "PATCH", "POST", "DELETE", "PUT"],
     credentials: true,
   })

@@ -1,4 +1,5 @@
 const User = require("../models/user");
+// require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const otpGenerator = require("otp-generator");
 const crypto = require("crypto");
@@ -155,6 +156,9 @@ exports.login = async (req, res, next) => {
 };
 
 exports.protect = async (req, res, next) => {
+  console.log("this is token:", req.headers.authorization.split(" ")[1]);
+  console.log("this is process.env.JWT_SECRET:", process.env.SECRET);
+
   // 1) Getting token and check if it's there
   let token;
   if (
@@ -178,7 +182,7 @@ exports.protect = async (req, res, next) => {
     });
   }
   // 2) Verification of token
-  const decoded = await promisify(jwt.verify)(token, process.env.JWT_SECRET);
+  const decoded = await promisify(jwt.verify)(token, process.env.SECRET);
 
   console.log(decoded);
 

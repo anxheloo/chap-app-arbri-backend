@@ -13,6 +13,11 @@ const requestSchema = new mongoose.Schema({
     ref: "User",
   },
 
+  status: {
+    type: String,
+    default: "pending",
+  },
+
   createdAt: {
     type: Date,
     default: Date.now(),
